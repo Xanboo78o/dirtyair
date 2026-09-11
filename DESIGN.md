@@ -78,6 +78,11 @@ temperature windows · cold tyres out of the pits.
 - **The AI must not brake on its own averaged braking estimate** — capability falls
   as you slow because downforce does. Track the baked profile instead.
 - **Banking sign**: bankDir follows `sign(curvature)`, or the bank throws you out.
+- **Never bleed `vy` when clamping `vx` at zero.** A spun car still has ground
+  speed; bleeding lateral velocity destroyed all of it in ~0.05 s and read as an
+  instant stop from 120 km/h.
+- Past the front tyre's peak slip (~0.17 rad) MORE lock gives LESS grip. The
+  controller must stop winding on or it scrubs the car straight off.
 - **Damage on NEW contact only** — per-tick accumulation kills a car leaning on a wall.
 - The grid sits behind the line, so the first crossing is the START, not a lap.
 
@@ -89,8 +94,12 @@ without touching a single `import` statement. Without it the browser happily mix
 new HTML with a cached old `race.js` — which cost real debugging time here.
 
 ## Not done yet
-- **AI pace is ~34% off the ideal line** and it still beaches occasionally. It races,
-  it defends, it pits, it makes mistakes — but it is not yet quick.
+- **AI pace is ~40% off the ideal line.** `tools/pace.mjs` measures what it can
+  sustain cleanly and `makeDriver` is capped to that, so it races, defends, pits
+  and makes mistakes without wrecking itself — but it is not quick. The loss is
+  almost entirely in the corners (92% of profile on the straights, 45-70% through
+  Lesmo/Ascari/Parabolica); the fix is better path tracking at the limit, not more
+  pace. Raising `pace` just makes it crash.
 - No safety car / VSC, no qualifying, no flags beyond yellow display.
 - No sound.
 - Monaco is the hardest for the AI (Swimming Pool).

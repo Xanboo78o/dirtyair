@@ -15,7 +15,9 @@ export function makeDriver(i, skill = 1) {
   const rng = mulberry(i * 7919 + 13);
   return {
     // never above 1.0: driving faster than the ideal line just means crashing
-    pace: Math.min(0.995, 0.905 + 0.058 * skill + rng() * 0.028),
+    // Tuned to what the controller can actually sustain CLEANLY, measured with
+    // tools/pace.mjs. Setting this near 1.0 just means the AI crashes.
+    pace: Math.min(0.94, 0.68 + 0.18 * skill + rng() * 0.025),
     aggression: 0.35 + rng() * 0.6,
     defence: 0.3 + rng() * 0.65,
     consistency: 0.4 + rng() * 0.55,
@@ -117,6 +119,13 @@ export function driveAI(e, world, dt) {
   // in a left turn, so adding it winds OFF left lock -- the right correction.
   const over = Math.abs(car.slipR) - Math.abs(car.slipF);
   if (over > 0.03) delta += Math.sign(car.slipR) * Math.min(0.30, (over - 0.03) * 1.8);
+
+  // Past the front tyre's peak slip angle, MORE lock gives LESS grip -- the
+  // Pacejka curve is falling. A real driver unwinds; the controller must not
+  // keep winding on and scrub the car into the gravel.
+  const PEAK = 0.26;
+  if (car.slipF < -PEAK) delta = Math.min(delta, car.delta);
+  else if (car.slipF > PEAK) delta = Math.max(delta, car.delta);
 
   // human wobble so the grid isn't robotic
   d.noiseT -= dt;

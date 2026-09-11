@@ -133,7 +133,10 @@ export function step(car, dt, env = {}) {
   if (car.r > RMAX) car.r = RMAX; else if (car.r < -RMAX) car.r = -RMAX;
   if (v < 3) car.r *= 1 - Math.min(0.9, 4 * dt);
 
-  if (car.vx < 0) { car.vx = 0; car.vy *= 0.85; }
+  // A spun car still has ground speed. Clamp forward velocity at zero, but do
+  // NOT bleed the lateral component -- doing that destroyed all the car's
+  // energy in about 0.05 s and read as an instant stop from 120 km/h.
+  if (car.vx < 0) car.vx = 0;
   // at a crawl the tyres bite and the car straightens out instead of hovering
   // sideways forever
   if (v < 5) {
