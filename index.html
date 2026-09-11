@@ -1,0 +1,84 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>DIRTY AIR</title>
+<link rel="stylesheet" href="./style.css">
+</head>
+<body>
+<canvas id="cv"></canvas>
+
+<!-- ===== MENU ===== -->
+<div id="menu" class="screen">
+  <div class="brand"><h1>DIRTY AIR</h1><p>real rules. real tyres. cheap paint.</p></div>
+  <div class="tracks" id="trackList"></div>
+  <div class="opts">
+    <label>LAPS <input id="optLaps" type="number" min="2" max="30" value="8"></label>
+    <label>GRID <input id="optGrid" type="number" min="2" max="16" value="10"></label>
+    <label>START <input id="optStart" type="number" min="1" max="16" value="6"></label>
+    <label>TYRE
+      <select id="optTyre"><option value="soft">SOFT</option><option value="medium" selected>MEDIUM</option><option value="hard">HARD</option></select>
+    </label>
+    <label>AI <select id="optSkill">
+      <option value="0.5">CLUB</option><option value="0.8">PRO</option><option value="1" selected>WORKS</option><option value="1.2">ALIEN</option>
+    </select></label>
+  </div>
+  <button id="go" class="go">START RACE</button>
+  <div class="keys">
+    <b>←→</b> steer &nbsp; <b>↑</b> throttle &nbsp; <b>↓</b> brake &nbsp; <b>SPACE</b> DRS &nbsp; <b>P</b> box this lap &nbsp; <b>L</b> racing line &nbsp; <b>ESC</b> pause
+  </div>
+</div>
+
+<!-- ===== HUD ===== -->
+<div id="hud" class="hidden">
+  <div id="tower"></div>
+  <div id="topright">
+    <div class="posbox"><span id="posNow">6</span><small id="posOf">/10</small></div>
+    <div class="lapbox">LAP <b id="lapNow">1</b>/<b id="lapOf">8</b></div>
+    <div class="times">
+      <div>LAST <span id="tLast">--.---</span></div>
+      <div>BEST <span id="tBest">--.---</span></div>
+    </div>
+    <canvas id="mini" width="190" height="150"></canvas>
+  </div>
+  <div id="bottomleft">
+    <div class="tyrebox">
+      <div class="tyreName" id="tyreName">MEDIUM</div>
+      <div class="tyreRow"><span>F</span><div class="bar"><i id="tfT"></i></div><div class="bar wear"><i id="tfW"></i></div></div>
+      <div class="tyreRow"><span>R</span><div class="bar"><i id="trT"></i></div><div class="bar wear"><i id="trW"></i></div></div>
+      <div class="tyreLegend">TEMP · WEAR</div>
+    </div>
+  </div>
+  <div id="bottomright">
+    <div class="spd"><b id="spd">0</b><small>KM/H</small></div>
+    <div class="pedals"><div class="ped"><i id="pedT"></i></div><div class="ped brake"><i id="pedB"></i></div></div>
+    <div class="lights"><span id="drsLight">DRS</span><span id="pitLight">BOX</span><span id="limLight">LIM</span></div>
+  </div>
+  <div id="gaps"><div id="gapAhead"></div><div id="gapBehind"></div></div>
+  <div id="radio"></div>
+  <div id="bigmsg"></div>
+</div>
+
+<!-- ===== PAUSE ===== -->
+<div id="pause" class="screen hidden">
+  <h2>PAUSED</h2>
+  <button id="resume" class="go">RESUME</button>
+  <button id="quit" class="go ghost">BACK TO MENU</button>
+</div>
+
+<!-- ===== RESULTS + HIGHLIGHTS ===== -->
+<div id="results" class="screen hidden">
+  <h2 id="resTitle">RACE RESULT</h2>
+  <div class="reelwrap">
+    <div class="reelhead"><span id="reelLabel">HIGHLIGHTS</span><span id="reelSub"></span></div>
+    <canvas id="reel" width="900" height="420"></canvas>
+    <div class="reelbar"><button id="reelPrev">&lsaquo;</button><span id="reelCount"></span><button id="reelNext">&rsaquo;</button></div>
+  </div>
+  <table id="classification"></table>
+  <button id="again" class="go">BACK TO MENU</button>
+</div>
+
+<script type="module" src="./js/main.js"></script>
+</body>
+</html>

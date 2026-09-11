@@ -1,0 +1,22 @@
+import { CIRCUITS, build, bbox, findCorners } from './geo.mjs';
+const GJ = new URL('../data/f1-circuits.geojson', import.meta.url).pathname;
+const key = process.argv[2] || 'monza';
+const W = +(process.argv[3] || 108), H = +(process.argv[4] || 44);
+const c = CIRCUITS[key];
+const t = build(GJ, c.id);
+const b = bbox(t.pts);
+const sc = Math.min((W - 3) / b.w, (H - 3) / b.h);
+const g = Array.from({ length: H }, () => Array(W).fill(' '));
+const put = (x, y, ch) => {
+  const cx = Math.round((x - b.x0) * sc) + 1, cy = H - 2 - Math.round((y - b.y0) * sc);
+  if (cx >= 0 && cx < W && cy >= 0 && cy < H) g[cy][cx] = ch;
+};
+for (const p of t.pts) put(p.x, p.y, Math.abs(p.curv) > 1 / 120 ? '#' : '.');
+const corners = findCorners(t.pts);
+const idx = s => Math.round(s / (t.pts[1].s - t.pts[0].s)) % t.pts.length;
+corners.forEach((co, i) => { const p = t.pts[idx(co.sPeak)]; put(p.x, p.y, String.fromCharCode(i < 9 ? 49 + i : 88)); });
+put(t.pts[0].x, t.pts[0].y, 'S');
+console.log(g.map(r => r.join('').replace(/\s+$/, '')).join('\n'));
+console.log(`\n${c.full} — baked ${t.length.toFixed(0)} m (official ${t.props.length} m), ${t.pts.length} samples, ${b.w.toFixed(0)}x${b.h.toFixed(0)} m footprint`);
+console.log(`corners (${corners.length}):`);
+console.log(corners.map((co, i) => `${String(i + 1).padStart(2)}:${co.dir > 0 ? 'L' : 'R'} R${co.R.toFixed(0)}m @${co.sPeak.toFixed(0)}m`).join('  '));
