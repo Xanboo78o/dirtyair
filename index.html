@@ -26,7 +26,7 @@
   </div>
   <button id="go" class="go">START RACE</button>
   <div class="keys">
-    <b>←→</b> steer &nbsp; <b>↑</b> throttle &nbsp; <b>↓</b> brake &nbsp; <b>SPACE</b> DRS &nbsp; <b>P</b> box this lap &nbsp; <b>L</b> racing line &nbsp; <b>ESC</b> pause
+    <b>←→</b> steer &nbsp; <b>↑</b> throttle &nbsp; <b>↓</b> brake &nbsp; <b>SPACE</b> DRS &nbsp; <b>P</b> box this lap &nbsp; <b>C</b> camera &nbsp; <b>L</b> racing line &nbsp; <b>ESC</b> pause
   </div>
 </div>
 
@@ -68,17 +68,34 @@
 </div>
 
 <!-- ===== RESULTS + HIGHLIGHTS ===== -->
-<div id="results" class="screen hidden">
-  <h2 id="resTitle">RACE RESULT</h2>
-  <div class="reelwrap">
-    <div class="reelhead"><span id="reelLabel">HIGHLIGHTS</span><span id="reelSub"></span></div>
-    <canvas id="reel" width="900" height="420"></canvas>
+<div id="results" class="hidden">
+  <div id="reelCaption"><b id="reelLabel"></b><span id="reelSub"></span></div>
+  <div id="resPanel">
+    <h2 id="resTitle">RACE RESULT</h2>
     <div class="reelbar"><button id="reelPrev">&lsaquo;</button><span id="reelCount"></span><button id="reelNext">&rsaquo;</button></div>
+    <table id="classification"></table>
+    <button id="again" class="go">BACK TO MENU</button>
   </div>
-  <table id="classification"></table>
-  <button id="again" class="go">BACK TO MENU</button>
 </div>
 
-<script type="module" src="./js/main.js"></script>
+<script type="importmap">
+{
+ "imports": {
+  "three": "./js/vendor/three.module.min.js?v=1789122030",
+  "./js/ai.js": "./js/ai.js?v=1789122030",
+  "./js/input.js": "./js/input.js?v=1789122030",
+  "./js/line.js": "./js/line.js?v=1789122030",
+  "./js/main.js": "./js/main.js?v=1789122030",
+  "./js/physics.js": "./js/physics.js?v=1789122030",
+  "./js/race.js": "./js/race.js?v=1789122030",
+  "./js/render3d.js": "./js/render3d.js?v=1789122030",
+  "./js/replay.js": "./js/replay.js?v=1789122030",
+  "./js/track.js": "./js/track.js?v=1789122030",
+  "./js/vendor/three.core.min.js": "./js/vendor/three.core.min.js?v=1789122030",
+  "./js/vendor/three.module.min.js": "./js/vendor/three.module.min.js?v=1789122030"
+ }
+}
+</script>
+<script type="module" src="./js/main.js?v=1789122030"></script>
 </body>
 </html>

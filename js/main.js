@@ -1,7 +1,7 @@
 import { Track } from './track.js';
 import { buildLine } from './line.js';
 import { Race } from './race.js';
-import { Renderer } from './render.js';
+import { Renderer3D } from './render3d.js';
 import { Recorder } from './replay.js';
 import { Hands } from './input.js';
 import { COMPOUNDS } from './physics.js';
@@ -54,7 +54,7 @@ async function start() {
   const gridSize = Math.max(2, +$('optGrid').value || 10);
   const playerGrid = Math.min(gridSize, Math.max(1, +$('optStart').value || 6));
   const race = new Race({ track, line, laps, gridSize, playerGrid, compound, skill: +$('optSkill').value });
-  const rend = new Renderer(cv, track, line);
+  const rend = new Renderer3D(cv, track, line);
   rend.resize();
   const rec = new Recorder(race);
   R = { track, line, race, rend, rec, radio: [] };
@@ -79,6 +79,10 @@ addEventListener('keydown', e => {
     $('pause').classList.toggle('hidden', mode === 'race');
   }
   if (e.code === 'KeyL' && R) R.rend.showLine = !R.rend.showLine;
+  if (e.code === 'KeyC' && R) {
+    const name = R.rend.cycleCamera();
+    R.radio.push({ text: 'CAMERA: ' + name, cls: '', t: 2.0 });
+  }
 });
 addEventListener('resize', () => { if (R) R.rend.resize(); });
 
@@ -100,8 +104,8 @@ function loop(ts) {
       acc -= DT;
     }
     const p = player();
-    if (p) rend.follow(p.car, dtReal);
-    rend.draw(race, {});
+    if (p) rend.follow(p, dtReal);
+    rend.draw(race);
     drawMini();
     updateHud(dtReal);
     if (race.state === 'over') showResults();
@@ -126,8 +130,7 @@ function updateHud(dt) {
     const lead = race.standings[0];
     let g = '';
     if (e !== lead) {
-      const ds = t.gap(lead.lap * t.length + lead.proj.s - (e.lap * t.length + e.proj.s), 0);
-      const d = (lead.lap * t.length + lead.proj.s) - (e.lap * t.length + e.proj.s);
+      const d = race.progress(lead) - race.progress(e);
       g = d > t.length ? `+${Math.floor(d / t.length)}L` : `+${(d / Math.max(e.car.speed || 40, 25)).toFixed(1)}`;
     }
     const cls = `row${e.isPlayer ? ' me' : ''}${e.inPit || e.pitRequest ? ' pit' : ''}${e.retired ? ' out' : ''}`;
@@ -195,7 +198,7 @@ function drawMini() {
 }
 
 // ---------- results + highlight reel ----------
-let reel = [], reelI = 0, reelF = 0, reelRend = null;
+let reel = [], reelI = 0, reelF = 0;
 
 function showResults() {
   mode = 'results';
@@ -227,12 +230,13 @@ function showResults() {
   reelI = 0;
   $('results').classList.remove('hidden');
   $('hud').classList.add('hidden');
-  if (!reelRend) {
-    reelRend = new Renderer($('reel'), R.track, R.line);
-  }
-  reelRend.resize();
   if (reel.length) { startClip(0); mode = 'reel'; }
-  else { $('reelLabel').textContent = 'NO HIGHLIGHTS'; $('reelSub').textContent = 'no passes, no defences — go racing'; $('reelCount').textContent = '0 / 0'; }
+  else {
+    $('reelLabel').textContent = 'NO HIGHLIGHTS';
+    $('reelSub').textContent = 'no passes, no defences \u2014 go racing';
+    $('reelCount').textContent = '0 / 0';
+    mode = 'results';
+  }
 }
 
 function startClip(i) {
@@ -250,16 +254,15 @@ $('reelNext').onclick = () => { startClip(reelI + 1); mode = 'reel'; };
 $('reelPrev').onclick = () => { startClip(reelI - 1); mode = 'reel'; };
 
 function playReel(dt) {
-  const { rec, race } = R, clip = R.clip;
+  const { rec, race, rend } = R, clip = R.clip;
   if (!clip) return;
   reelF += dt * clip.hz;
   if (reelF > clip.to) reelF = clip.from;
   const view = rec.frameView(Math.floor(reelF), race);
   if (!view) return;
   const me = view.entries.find(e => e.isPlayer);
-  const other = view.entries.find(e => e.idx === clip.ev.other);
-  const cx = other ? (me.car.x + other.car.x) / 2 : me.car.x;
-  const cy = other ? (me.car.y + other.car.y) / 2 : me.car.y;
-  reelRend.lookAt(cx, cy, 6.2);
-  reelRend.draw(view, { hud: false });
+  const other = view.entries.find(e => e.idx === clip.ev.other) || me;
+  rend.syncCars(view);
+  rend.frameTwo(me.car, other.car, dt);
+  rend.renderer.render(rend.scene, rend.camera);
 }

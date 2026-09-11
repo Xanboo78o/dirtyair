@@ -12,8 +12,10 @@ front downforce, which is exactly why passing is hard and why the tow matters.
 - **Keyboard.** Not a compromise — `input.js` models the DRIVER'S HANDS: the wheel
   winds on at a finite rate, self-centres faster than it winds on (so you catch a
   slide by letting go), and usable lock falls away with speed.
-- **Top-down, world-up camera.** Readability of who is alongside you beats immersion,
-  because the game is wheel-to-wheel.
+- **Behind the car, in 3D.** I shipped top-down first and Adam rejected it
+  immediately ("not top down???"). Low-poly 3D chase cam is the view. `C` cycles
+  CHASE / CLOSE / NOSE / OVERHEAD. The simulation is view-independent, so the swap
+  cost nothing but the renderer.
 - **Five real circuits**, geometry from OpenStreetMap, not drawn by hand.
 - **Highlights are the point.** Every pass and every successful defence is detected
   live, then replayed with the real corner name attached.
@@ -78,6 +80,13 @@ temperature windows · cold tyres out of the pits.
 - **Banking sign**: bankDir follows `sign(curvature)`, or the bank throws you out.
 - **Damage on NEW contact only** — per-tick accumulation kills a car leaning on a wall.
 - The grid sits behind the line, so the first crossing is the START, not a lap.
+
+## Cache busting (do not remove)
+`tools/stamp.mjs` rewrites the import map with `?v=<epoch>` for every local module,
+and a `.git/hooks/pre-commit` re-stamps on every commit. Import maps remap URL-like
+specifiers against the document base, so this versions the whole module graph
+without touching a single `import` statement. Without it the browser happily mixes
+new HTML with a cached old `race.js` — which cost real debugging time here.
 
 ## Not done yet
 - **AI pace is ~34% off the ideal line** and it still beaches occasionally. It races,

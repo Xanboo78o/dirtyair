@@ -81,7 +81,7 @@ export class Race {
         nextCompound: null, usedCompounds: new Set([car.tyre.c.key]),
         penalty: 0, warnings: 0, offNow: false, retired: false,
         ahead: null, behind: null, aheadGapT: 99, behindGapT: 99,
-        finished: false, finishTime: null, totalTime: 0, pastHalf: false, stuck: 0,
+        finished: false, finishTime: null, totalTime: 0, pastHalf: false, stuck: 0, crossed0: false,
       });
     }
     this.order();
@@ -102,9 +102,13 @@ export class Race {
     return vmin < v0 * 0.86;
   }
 
+  progress(e) {
+    return (e.lap + (e.crossed0 ? 1 : 0)) * this.track.length + e.proj.s;
+  }
+
   order() {
     const t = this.track;
-    const prog = e => e.lap * t.length + e.proj.s;
+    const prog = e => this.progress(e);
     const alive = this.entries.slice().sort((a, b) => {
       if (a.finished !== b.finished) return a.finished ? -1 : 1;
       if (a.finished && b.finished) return a.finishTime - b.finishTime;
@@ -217,6 +221,7 @@ export class Race {
         // the grid sits behind the line, so this first crossing is the START,
         // not a lap: lap 1 is timed from here, as it is in the real thing
         e.lapStart = this.time;
+        e.crossed0 = true;
       } else if (crossed && racing && !e.finished) {
         e.lap++;
         e.pastHalf = false;
