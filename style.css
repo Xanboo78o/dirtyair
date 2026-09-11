@@ -94,10 +94,10 @@ h2{letter-spacing:.2em;font-size:22px;font-weight:700}
 
 /* ---------- results ---------- */
 #results{position:fixed;inset:0;z-index:22;pointer-events:none}
-#reelCaption{position:absolute;top:22px;left:50%;transform:translateX(-50%);text-align:center}
+#reelCaption{position:absolute;top:22px;left:0;right:min(430px,42vw);text-align:center}
 #reelCaption b{display:block;letter-spacing:.2em;font-size:22px}
 #reelCaption span{color:var(--dim);font-size:11px;letter-spacing:.18em}
-#resPanel{position:absolute;right:0;top:0;bottom:0;width:min(430px,42vw);overflow:auto;
+#resPanel{position:absolute;right:0;top:0;bottom:0;width:min(430px,42vw);overflow-y:auto;overflow-x:hidden;
   background:rgba(8,10,13,.9);backdrop-filter:blur(7px);border-left:1px solid var(--line);
   padding:20px 18px;display:flex;flex-direction:column;gap:14px;align-items:flex-start;pointer-events:auto}
 #resPanel h2{font-size:17px}
@@ -112,8 +112,9 @@ h2{letter-spacing:.2em;font-size:22px;font-weight:700}
 .reelbar button{background:transparent;border:1px solid var(--line);color:var(--fg);width:34px;height:28px;
   cursor:pointer;font-size:17px;border-radius:2px}
 #reelCount{color:var(--dim);font-size:11px;letter-spacing:.15em}
-#classification{border-collapse:collapse;font-size:12px;width:100%}
-#classification td,#classification th{padding:5px 9px;border-bottom:1px solid var(--line);text-align:left}
+#classification{border-collapse:collapse;font-size:11px;width:100%;table-layout:fixed}
+#classification td,#classification th{padding:4px 5px;border-bottom:1px solid var(--line);text-align:left;
+  overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 #classification th{color:var(--dim);font-size:10px;letter-spacing:.16em;font-weight:500}
 #classification td.n{font-variant-numeric:tabular-nums}
 #classification tr.me{background:#191d24}

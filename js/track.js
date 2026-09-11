@@ -52,7 +52,9 @@ export class Track {
       i: best,
       s: this.wrap(best * this.ds + (Math.cos(h) * dx + Math.sin(h) * dy)),
       lat: -Math.sin(h) * dx + Math.cos(h) * dy,
-      w: this.w[best], run: this.run[best], bank: this.bank[best],
+      w: this.w[best], runL: this.runL[best], runR: this.runR[best],
+      run: (-Math.sin(h) * dx + Math.cos(h) * dy) > 0 ? this.runL[best] : this.runR[best],
+      bank: this.bank[best],
       curv: this.curv[best], hdg: h,
     };
   }

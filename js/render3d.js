@@ -83,7 +83,8 @@ export class Renderer3D {
     this.hR = j => outsideLeft(j) < 0 ? rise(j) : 0;
     const hL = this.hL, hR = this.hR;
 
-    const W = j => t.w[j], R = j => t.run[j];
+    const W = j => t.w[j];
+    const RL = j => t.runL[j], RR = j => t.runR[j];
 
     // tarmac
     g.add(ribbon(j => W(j), j => -W(j), hL, hR, COL.tarmac, 0));
@@ -123,8 +124,8 @@ export class Renderer3D {
     }
     // run-off both sides
     const runCol = t.wall === 'gravel' ? COL.gravel : t.wall === 'wall' ? COL.concrete : 0x6f7a5e;
-    g.add(ribbon(j => W(j) + R(j), j => W(j), hL, hL, runCol, -0.04));
-    g.add(ribbon(j => -W(j), j => -W(j) - R(j), hR, hR, runCol, -0.04));
+    g.add(ribbon(j => W(j) + RL(j), j => W(j), hL, hL, runCol, -0.04));
+    g.add(ribbon(j => -W(j), j => -W(j) - RR(j), hR, hR, runCol, -0.04));
 
     // barriers: a vertical strip at the edge of the run-off, with sponsors on it
     const wallTex = this.sponsorTexture(t.sponsors);
@@ -134,7 +135,7 @@ export class Renderer3D {
       for (let i = 0; i <= n; i++) {
         const j = i % n, h = t.hdg[j];
         const nx = -Math.sin(h), ny = Math.cos(h);
-        const o = side * (W(j) + R(j));
+        const o = side * (W(j) + (side > 0 ? RL(j) : RR(j)));
         const base = (side > 0 ? hL(j) : hR(j));
         pos.push(t.x[j] + nx * o, base, -(t.y[j] + ny * o));
         pos.push(t.x[j] + nx * o, base + wallH, -(t.y[j] + ny * o));

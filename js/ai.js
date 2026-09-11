@@ -10,14 +10,15 @@ export const GRID_NAMES = [
   'ANTONELLI', 'HADJAR',
 ];
 
-export function makeDriver(i, skill = 1) {
+export function makeDriver(i, skill = 1, cap = 0.85) {
   // a grid where everyone is identical is a boring grid
   const rng = mulberry(i * 7919 + 13);
   return {
     // never above 1.0: driving faster than the ideal line just means crashing
-    // Tuned to what the controller can actually sustain CLEANLY, measured with
-    // tools/pace.mjs. Setting this near 1.0 just means the AI crashes.
-    pace: Math.min(0.94, 0.68 + 0.18 * skill + rng() * 0.025),
+    // `cap` is the fastest this CIRCUIT can be driven cleanly, measured per
+    // track with tools/pace.mjs and baked in. Monaco will not take what Monza
+    // will; asking for more just means the AI crashes.
+    pace: cap * Math.min(1, 0.78 + 0.20 * skill) + (rng() - 0.5) * 0.02,
     aggression: 0.35 + rng() * 0.6,
     defence: 0.3 + rng() * 0.65,
     consistency: 0.4 + rng() * 0.55,
@@ -84,6 +85,24 @@ export function driveAI(e, world, dt) {
     }
   }
 
+  // Boxing this lap? Get across to the pit side BEFORE the entry, or you sail
+  // straight past it every time.
+  let toPit = false;
+  if (e.pitRequest && !e.inPit && world.pit) {
+    const dEntry = track.gap(world.pit.entryS, e.proj.s);
+    // Ease across, and stay well inside the white line: Monza's pit entry is
+    // right after the Parabolica, so dragging the car to the very edge mid-
+    // corner just puts it in the gravel.
+    if (dEntry > -70 && dEntry < 130) {
+      const side = world.pit.side || 1;
+      const corner = Math.min(1, Math.abs(e.proj.curv) * 300);
+      const pull = Math.min(1, (130 - dEntry) / 110) * (1 - 0.75 * corner);
+      wantOff = wantOff * (1 - pull) + side * (track.w[i] - 2.2) * pull;
+      if (dEntry < 60 && e.pitProj && e.pitProj.s < world.pit.len * 0.4) toPit = true;
+    }
+  }
+  e.toPit = toPit;
+
   const lim = Math.max(0.3, track.w[i] - 1.0);
   wantOff = Math.max(-lim, Math.min(lim, wantOff));
 
@@ -92,7 +111,7 @@ export function driveAI(e, world, dt) {
   // exit. Stanley steers on heading error + cross-track error, so it actually
   // stays ON the line.
   let delta;
-  if (e.inPit && world.pit && e.pitProj) {
+  if ((e.inPit || toPit) && world.pit && e.pitProj) {
     const tgt = world.pit.point(e.pitProj.s + Math.min(18, 6 + v * 0.5), 0);
     let ang = Math.atan2(tgt.y - car.y, tgt.x - car.x) - car.hdg;
     while (ang > Math.PI) ang -= 2 * Math.PI;
@@ -104,12 +123,16 @@ export function driveAI(e, world, dt) {
     // on entry, which turns in early and cuts to the inside wall.
     const prev = Math.round(Math.min(8, CAR.a + 1 + v * 0.055) / track.ds);
     const j = aheadI(prev);
+    // Feed-forward: the steering the corner needs before any error shows up.
+    // Pure error-correction always lags into a corner and runs wide.
+    const kappa = line.cur[j] || 0;
+    const ff = Math.atan(CAR.L * kappa);
     let hErr = line.hdg[j] - car.hdg;
     while (hErr > Math.PI) hErr -= 2 * Math.PI;
     while (hErr < -Math.PI) hErr += 2 * Math.PI;
     const cross = e.proj.lat - wantOff;              // + = left of where I want to be
     const K = lost ? 1.6 : 3.2;
-    delta = hErr + Math.atan2(-K * cross, Math.max(v, 7));
+    delta = ff + hErr + Math.atan2(-K * cross, Math.max(v, 7));
     // damp the yaw so it settles instead of weaving
     delta -= 0.030 * car.r;
   }
@@ -150,7 +173,8 @@ export function driveAI(e, world, dt) {
   if (car.drsOpen) mod *= 1.02;
 
   let vTarget = line.v[i] * mod;
-  if (e.inPit) vTarget = world.pitSpeed;
+  if (e.inPit) vTarget = world.pitSpeed * (e.onPitRoad ? 1 : 1.6);
+  else if (toPit) vTarget = Math.min(vTarget, world.pitSpeed * 2.2);
   if (lost) vTarget = Math.min(vTarget, 13);      // you cannot rejoin at 250 km/h
 
   // Walk the speed profile BACKWARDS from 260 m ahead to the car, propagating
@@ -176,8 +200,16 @@ export function driveAI(e, world, dt) {
     }
   }
   let vAllow = Math.min(vTarget, vlim);
-  if (e.inPit) vAllow = world.pitSpeed;
+  if (e.inPit) vAllow = world.pitSpeed * (e.onPitRoad ? 1 : 1.6);
+  else if (toPit) vAllow = Math.min(vAllow, world.pitSpeed * 2.2);
   if (lost) vAllow = Math.min(vTarget, 13);
+
+  // Stop in the box. Nothing else in the loop ever asks the car to come to a
+  // halt, so without this the AI drives through its own pit stop.
+  if (e.inPit && world.pit && e.pitProj && (e.pitPhase === 'in' || e.pitPhase === 'stopping')) {
+    const dBox = world.pit.boxS - e.pitProj.s;
+    if (dBox < 45) vAllow = Math.min(vAllow, Math.max(0, dBox * 0.34));
+  }
 
   let throttle = 0, brake = 0;
   if (v > vAllow + 0.25) {

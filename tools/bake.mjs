@@ -18,22 +18,29 @@ const DS = 2.0;
 // in lap-relative metres and are applied after the start offset.
 const SPEC = {
   monza: {
+    aiPace: 0.80,
     country: 'ITALY', w: 5.75, runoff: 14, wall: 'gravel', startOff: 0,
     // Monza's long straights are lined much closer than its corner run-offs.
-    runoffOver: [[0, 560, 9], [5100, 5768, 9]],
+    // The Rettifilo has a huge asphalt escape road in reality; without it a
+    // car that runs wide out of Monza's heaviest braking zone hits a barrier
+    // 9 m off the road and is beached for the rest of the race.
+    runoffOver: [[0, 430, 9], [440, 760, 28], [5100, 5768, 9]],
     drs: 2, corner: [200, 14, 24, 40],
   },
   suzuka: {
+    aiPace: 0.74,
     country: 'JAPAN', w: 6.0, runoff: 12, wall: 'gravel', startOff: 0,
     wOver: [[430, 700, 7.5]],           // T1/T2 is notably wide
-    runoffOver: [[2000, 2300, 5]],      // Degner is famously tight on space
+    runoffOver: [[2000, 2300, 7]],      // Degner is famously tight on space
     drs: 1, crossover: true, corner: [200, 14, 24, 40],
   },
   zandvoort: {
+    aiPace: 0.68,
     country: 'NETHERLANDS', w: 5.0, runoff: 6, wall: 'barrier', startOff: 0,
     drs: 2, corner: [200, 14, 24, 32],
   },
   monaco: {
+    aiPace: 0.70,
     country: 'MONACO', w: 4.6, runoff: 3.2, wall: 'wall', startOff: null,
     wOver: [[1020, 1130, 3.8]],         // Fairmont hairpin, tightest in F1
     drs: 1, corner: [150, 8, 14, 11], smooth: 4, lineMargin: 1.15,
@@ -46,6 +53,7 @@ const SPEC = {
       [2975, 'Anthony Nogh\u00e8s']],
   },
   baku: {
+    aiPace: 0.74,
     country: 'AZERBAIJAN', w: 6.5, runoff: 2.6, wall: 'wall', startOff: 0,
     wOver: [[2450, 2800, 3.8]],         // the castle section, narrowest in F1
     runoffOver: [[0, 300, 3], [4400, 5939, 3]],
@@ -131,6 +139,7 @@ const SPONSORS = [
 ];
 
 const report = [];
+let out_pitClearance = 0;
 for (const [key, meta] of Object.entries(CIRCUITS)) {
   const spec = SPEC[key];
   const raw = loadRaw(GJ, meta.id);
@@ -240,10 +249,16 @@ for (const [key, meta] of Object.entries(CIRCUITS)) {
   }
   applyOver(W, center, spec.wOver, length);
   applyOver(RUN, center, spec.runoffOver, length);
-  // never let inner run-off invert through the centre of a tight corner
+  // Run-off per side. The inside of a tight corner has to be clamped or the
+  // offset polygon inverts through the corner's centre -- but clamping BOTH
+  // sides turns a chicane into a 2.5 m walled box and beaches anyone who runs
+  // a little wide.
+  const RUNL = RUN.slice(), RUNR = RUN.slice();
   for (const p of center) {
     const R = 1 / Math.max(Math.abs(p.curv), 1e-6);
-    RUN[p.idx] = Math.min(RUN[p.idx], Math.max(1.5, R * 0.8 - W[p.idx]));
+    const cap = Math.max(1.5, R * 0.8 - W[p.idx]);
+    if (p.curv > 0) RUNL[p.idx] = Math.min(RUNL[p.idx], cap);   // left turn -> inside is left
+    else if (p.curv < 0) RUNR[p.idx] = Math.min(RUNR[p.idx], cap);
   }
 
   // ---- DRS ------------------------------------------------------------------
@@ -294,16 +309,34 @@ for (const [key, meta] of Object.entries(CIRCUITS)) {
     }
     pit = { entryS: +entryS.toFixed(0), exitS, side, synth: true, pts };
   }
+  // The barrier sits at w+run. A pit lane further out than that is sealed off
+  // behind a wall, so any car heading for the pits drives into it. Open the
+  // run-off along the pit lane so the lane is actually reachable.
+  if (pit) {
+    let need = 0;
+    for (const [px, py] of pit.pts) need = Math.max(need, Math.abs(project(px, py).lat));
+    need = Math.min(40, need + 4.5);
+    for (const p of center) {
+      const sp = p.lapS;
+      const inRange = pit.entryS <= pit.exitS
+        ? (sp >= pit.entryS && sp <= pit.exitS)
+        : (sp >= pit.entryS || sp <= pit.exitS);
+      if (inRange) { const v = Math.max(0, need - W[p.idx]); RUNL[p.idx] = Math.max(RUNL[p.idx], v); RUNR[p.idx] = Math.max(RUNR[p.idx], v); }
+    }
+    out_pitClearance = need;
+  }
+
   const b = bbox(center);
   const out = {
-    key, name: meta.name, full: meta.full, country: spec.country,
+    key, name: meta.name, full: meta.full, country: spec.country, aiPace: spec.aiPace ?? 0.85,
     length: +length.toFixed(1), ds: DS, wall: spec.wall, crossover: !!spec.crossover,
     bbox: { x0: +b.x0.toFixed(1), y0: +b.y0.toFixed(1), x1: +b.x1.toFixed(1), y1: +b.y1.toFixed(1) },
     x: byLapS.map(p => +p.x.toFixed(2)),
     y: byLapS.map(p => +p.y.toFixed(2)),
     w: byLapS.map(p => +W[p.idx].toFixed(2)),
     bank: byLapS.map(p => BANK[p.idx]),
-    run: byLapS.map(p => +RUN[p.idx].toFixed(1)),
+    runL: byLapS.map(p => +RUNL[p.idx].toFixed(1)),
+    runR: byLapS.map(p => +RUNR[p.idx].toFixed(1)),
     line: null,
     corners: corners.map(c => ({ n: c.n, num: c.num || null, name: c.name || null,
       s0: +c.s0.toFixed(0), s1: +c.s1.toFixed(0), s: +c.sPeak.toFixed(0),

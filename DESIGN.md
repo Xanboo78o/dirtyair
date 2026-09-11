@@ -83,6 +83,18 @@ temperature windows · cold tyres out of the pits.
   instant stop from 120 km/h.
 - Past the front tyre's peak slip (~0.17 rad) MORE lock gives LESS grip. The
   controller must stop winding on or it scrubs the car straight off.
+- **Run-off is per side (`runL`/`runR`).** The clamp that stops the INSIDE of a
+  tight corner inverting must not touch the outside, or a chicane becomes a
+  2.5 m walled box that beaches anyone running slightly wide.
+- **Pit lanes must be densified before projecting onto them.** OSM pit lanes can
+  have 35 m between nodes; nearest-NODE distance then reads 17 m off for a car
+  driving straight down the middle, which trips every "left the lane" test.
+- **Commit to the pits at the entry line.** The lane can be 10-15 m away there,
+  so a proximity test never fires and the car sails past its own pit stop.
+- A pit stop needs an explicit STOPPING phase. "Inside a 4.5 m window AND already
+  slow" never triggers, because the car creeps through the window.
+- `gap(a, b)` is "a is ahead of b" -- getting that backwards silently disables
+  whatever crossing you are detecting.
 - **Damage on NEW contact only** — per-tick accumulation kills a car leaning on a wall.
 - The grid sits behind the line, so the first crossing is the START, not a lap.
 
@@ -94,7 +106,7 @@ without touching a single `import` statement. Without it the browser happily mix
 new HTML with a cached old `race.js` — which cost real debugging time here.
 
 ## Not done yet
-- **AI pace is ~40% off the ideal line.** `tools/pace.mjs` measures what it can
+- **AI pace is ~30-45% off the ideal line.** `tools/pace.mjs` measures what it can
   sustain cleanly and `makeDriver` is capped to that, so it races, defends, pits
   and makes mistakes without wrecking itself — but it is not quick. The loss is
   almost entirely in the corners (92% of profile on the straights, 45-70% through
@@ -102,7 +114,10 @@ new HTML with a cached old `race.js` — which cost real debugging time here.
   pace. Raising `pace` just makes it crash.
 - No safety car / VSC, no qualifying, no flags beyond yellow display.
 - No sound.
-- Monaco is the hardest for the AI (Swimming Pool).
+- The AI still runs wide too often on the tight circuits. Monza and Suzuka are
+  clean (a handful of offs per race); Zandvoort, Monaco and Baku are not, and on
+  a street circuit running wide means a wall. It is tracking error at the limit,
+  not bravery -- it fails at pace 0.62 as readily as 0.86.
 
 ## Harnesses (use these instead of guessing)
 - `node tools/map.mjs <track>` — ASCII circuit map + corner radii

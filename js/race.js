@@ -11,7 +11,22 @@ const TEAM_COLS = ['#1fd2be', '#ff8000', '#e8002d', '#ffd400', '#3671c6', '#27f4
 export class PitLane {
   constructor(raw, track) {
     this.track = track;
-    const p = raw.pts.map(([x, y]) => ({ x, y }));
+    // OSM pit lanes can be 35 m between nodes. Projecting onto raw nodes then
+    // measures distance to the nearest NODE, not to the lane, so a car driving
+    // perfectly straight down the middle reads as 17 m off it. Densify first.
+    const src = raw.pts.map(([x, y]) => ({ x, y }));
+    const p = [];
+    for (let i = 0; i < src.length; i++) {
+      p.push(src[i]);
+      const q = src[i + 1];
+      if (!q) break;
+      const d = Math.hypot(q.x - src[i].x, q.y - src[i].y);
+      const n = Math.floor(d / 2.5);
+      for (let k = 1; k < n; k++) {
+        const f = k / n;
+        p.push({ x: src[i].x + (q.x - src[i].x) * f, y: src[i].y + (q.y - src[i].y) * f });
+      }
+    }
     this.pts = []; this.s = [0];
     let acc = 0;
     for (let i = 0; i < p.length; i++) {
@@ -72,7 +87,7 @@ export class Race {
         name: isPlayer ? 'YOU' : GRID_NAMES[k % GRID_NAMES.length],
         num: isPlayer ? 78 : (k + 1),
         col: isPlayer ? '#ffffff' : TEAM_COLS[k % TEAM_COLS.length],
-        driver: isPlayer ? null : makeDriver(k, skill),
+        driver: isPlayer ? null : makeDriver(k, skill, track.aiPace ?? 0.85),
         lap: 0, gridPos: k + 1, pos: k + 1,
         proj: track.project(p.x, p.y), lastS: gs, crossed: false,
         lapStart: 0, lastLap: null, bestLap: null, laps: [],
@@ -162,11 +177,12 @@ export class Race {
       if (e.finished) inp = { wheel: inp.wheel, throttle: inp.throttle * 0.5, brake: 0 };
 
       // pit limiter: real cars have a button, so don't punish the keyboard
-      if (e.inPit && car.speed > this.pitSpeed) { inp = { ...inp, throttle: 0, brake: Math.max(inp.brake, 0.25) }; }
-      if (e.inPit && car.speed > this.pitSpeed * 1.02) inp.brake = 1;
+      if (e.onPitRoad && car.speed > this.pitSpeed) { inp = { ...inp, throttle: 0, brake: Math.max(inp.brake, 0.25) }; }
+      if (e.onPitRoad && car.speed > this.pitSpeed * 1.02) inp.brake = 1;
 
       // pit stop: hold still in the box
       if (e.pitPhase === 'stopped') inp = { wheel: 0, throttle: 0, brake: 1 };
+      else if (e.pitPhase === 'stopping') inp = { ...inp, throttle: 0, brake: 1 };
 
       car.delta = inp.wheel * steerLock(car.speed);
       car.throttle = inp.throttle; car.brake = inp.brake;
@@ -205,12 +221,32 @@ export class Race {
       if (this.pit) {
         const pp = this.pit.project(car.x, car.y);
         e.pitProj = pp;
-        const near = pp.d < this.pit.width * 1.25 && pp.s > -6 && pp.s < this.pit.len + 6;
-        if (!e.inPit && near && e.pitRequest) { e.inPit = true; e.pitPhase = 'in'; this.log('pit', `${e.name} PITS`, e); }
-        else if (e.inPit && !near) {
-          if (e.pitPhase === 'out' || pp.s > this.pit.len - 4) { e.inPit = false; e.pitPhase = null; e.pitRequest = false; }
-          else if (pp.d > this.pit.width * 2.2) { e.inPit = false; e.pitPhase = null; }
+        const L = this.pit.len;
+        // The lane diverges gradually, so at the entry it can still be 10-15 m
+        // off the track centreline. Requiring the car to already be within a
+        // lane width means it can never get in.
+        // gap(a, b) is 'a is ahead of b', so this counts DOWN to the entry
+        const dEnt = t.gap(this.pit.entryS, pr.s);
+        const prevEnt = t.gap(this.pit.entryS, prev);
+        // Commit at the entry. The lane can still be 10-15 m away there, so
+        // waiting until the car is already inside it means it never commits and
+        // sails past the pits lap after lap.
+        if (!e.inPit && e.pitRequest && prevEnt > 0 && dEnt <= 0) {
+          if (pp.s < L * 0.6) {
+            e.inPit = true; e.pitPhase = 'in';
+            this.log('pit', `${e.name} PITS`, e);
+          } else {
+            // missed the entry: drop the request rather than spend the rest of
+            // the race dragging itself toward a pit lane it never reaches
+            e.pitRequest = false;
+          }
+        } else if (e.inPit) {
+          if (pp.s > L - 12 || pp.d > this.pit.width * 6) {
+            e.inPit = false; e.pitPhase = null; e.pitRequest = false;
+          }
         }
+        // the limiter only bites once you are actually on the pit road
+        e.onPitRoad = e.inPit && pp.d < this.pit.width * 2.2;
         if (e.inPit) this.servicePit(e, dt);
       }
 
@@ -305,8 +341,12 @@ export class Race {
 
   servicePit(e, dt) {
     const pp = e.pitProj, box = this.pit.boxS;
-    if (e.pitPhase === 'in' && Math.abs(pp.s - box) < 4.5 && e.car.speed < 2.2) {
-      e.pitPhase = 'stopped'; e.pitTimer = STOP_TIME + Math.random() * 0.6;
+    // Position first, then wait for it to actually stop. Requiring "inside a
+    // 4.5 m window AND already slow" means a car creeping through its own box
+    // never triggers a stop at all.
+    if (e.pitPhase === 'in' && pp.s > box - 2) e.pitPhase = 'stopping';
+    if (e.pitPhase === 'stopping') {
+      if (e.car.speed < 1.2) { e.pitPhase = 'stopped'; e.pitTimer = STOP_TIME + Math.random() * 0.6; }
     } else if (e.pitPhase === 'stopped') {
       e.pitTimer -= dt;
       if (e.pitTimer <= 0) {

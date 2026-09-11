@@ -10,7 +10,7 @@ const track = new Track(JSON.parse(fs.readFileSync(`data/tracks/${key}.json`, 'u
 const line = buildLine(track, COMPOUNDS.medium.mu);
 const fmt = s => s == null ? '  --.---' : `${Math.floor(s / 60)}:${(s % 60).toFixed(3).padStart(6, '0')}`;
 console.log(`${track.name}  ideal ${fmt(line.lapTime)}`);
-for (const pace of [0.80, 0.85, 0.88, 0.91, 0.94, 0.97]) {
+for (const pace of (process.argv[3]||'0.80,0.85,0.88,0.91,0.94,0.97').split(',').map(Number)) {
   const race = new Race({ track, line, laps: 4, gridSize: 1, playerGrid: 1, compound: 'medium' });
   const e = race.entries[0];
   e.isPlayer = false; e.driver = makeDriver(7); e.driver.pace = pace;
